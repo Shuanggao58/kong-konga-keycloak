@@ -1,6 +1,6 @@
 version: '3.4'
 
-networks: 
+networks:
   kong-net:
     driver: bridge
   keycloak-net:
@@ -23,12 +23,27 @@ services:
       POSTGRES_USER:     kong
       POSTGRES_PASSWORD: kong
 
-  kong:
-    build:
-      context: ./      
+  kong-migrations:
     image: kong-oidc:latest
+    command: kong migrations bootstrap && kong migrations up
     depends_on:
       - kong-db
+    networks:
+      - kong-net
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_PORT: 5432
+      KONG_PG_DATABASE: api-gw
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+
+  kong:
+    build:
+      context: ./
+    image: kong-oidc:latest
+    depends_on:
+      - kong-migrations
     networks:
       - kong-net
     ports:
@@ -71,7 +86,7 @@ services:
 
   keycloak-db:
     image: postgres:14-alpine
-    volumes: 
+    volumes:
       - keycloak-datastore:/var/lib/postgresql/data
     networks:
       - keycloak-net
@@ -109,10 +124,10 @@ services:
     networks:
       - kong-net
     restart: always
-    volumes: 
+    volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
-    ports: 
+    ports:
       - 9090:9090
 
   grafana:
@@ -123,7 +138,7 @@ services:
     networks:
       - kong-net
     restart: always
-    volumes: 
+    volumes:
       - ./grafana/provisioning/:/etc/grafana/provisioning
     ports:
       - 3000:3000
